@@ -6,52 +6,134 @@ import { Slide } from '../interfaces/Slide';
 
 dotenv.config();
 
-const getAccessToken = async (): Promise<string | null> => {
-  if (!process.env.ALAI_API_KEY || !process.env.ALAI_EMAIL || !process.env.ALAI_PASSWORD) {
-    console.error("API key, email, and password are required");
-    return null;
+let cachedToken: {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+} | null = null;
+
+const TEN_MINUTES_IN_SECONDS = 10 * 60;
+
+export const getAccessToken = async (): Promise<string | null> => {
+  const now = Math.floor(Date.now() / 1000);
+
+  if (cachedToken && cachedToken.expires_at - now > TEN_MINUTES_IN_SECONDS) {
+    return cachedToken.access_token;
   }
 
-  const myHeaders = new Headers();
-  myHeaders.append("accept", "*/*");
-  myHeaders.append("accept-language", "en-GB,en-US;q=0.9,en;q=0.8");
-  myHeaders.append("apikey", process.env.ALAI_API_KEY!);
-  myHeaders.append("content-type", "application/json;charset=UTF-8");
-  myHeaders.append("origin", "https://app.getalai.com");
-  myHeaders.append("priority", "u=1, i");
-  myHeaders.append("sec-ch-ua", "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"");
-  myHeaders.append("sec-ch-ua-mobile", "?0");
-  myHeaders.append("sec-ch-ua-platform", "\"macOS\"");
-  myHeaders.append("sec-fetch-dest", "empty");
-  myHeaders.append("sec-fetch-mode", "cors");
-  myHeaders.append("sec-fetch-site", "same-site");
-  myHeaders.append("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36");
-  myHeaders.append("x-client-info", "supabase-js-web/2.45.4");
-  myHeaders.append("x-supabase-api-version", "2024-01-01");
+  if (cachedToken) {
+    const refreshed = await getAccessTokenFromRefreshToken(cachedToken.refresh_token);
+    if (refreshed) {
+      const expiresAt = now + refreshed.expires_in;
+      cachedToken = {
+        access_token: refreshed.access_token,
+        refresh_token: refreshed.refresh_token,
+        expires_at: expiresAt,
+      };
+      return cachedToken.access_token;
+    }
+  }
 
-  const raw = JSON.stringify({
-    email: process.env.ALAI_EMAIL,
-    password: process.env.ALAI_PASSWORD,
-    gotrue_meta_security: {}
+  const freshToken = await getAccessTokenWithPassword();
+  if (freshToken?.access_token && freshToken?.refresh_token && freshToken?.expires_at) {
+    cachedToken = freshToken;
+    return cachedToken.access_token;
+  }
+
+  return null;
+};
+
+const getAccessTokenWithPassword = async (): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+} | null> => {
+  const headers = new Headers({
+    accept: '*/*',
+    'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
+    apikey: process.env.ALAI_API_KEY!,
+    'content-type': 'application/json;charset=UTF-8',
+    origin: 'https://app.getalai.com',
+    priority: 'u=1, i',
+    'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"macOS"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-site',
+    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...',
+    'x-client-info': 'supabase-js-web/2.45.4',
+    'x-supabase-api-version': '2024-01-01',
   });
 
-  const requestOptions = {
-    method: "POST",
-    headers: myHeaders,
-    body: raw,
-    redirect: "follow" as RequestRedirect
-  };
+  const body = JSON.stringify({
+    email: process.env.ALAI_EMAIL,
+    password: process.env.ALAI_PASSWORD,
+    gotrue_meta_security: {},
+  });
 
   try {
-    const response = await fetch("https://api.getalai.com/auth/v1/token?grant_type=password", requestOptions);
-    const result = await response.text();
-    const parsed = JSON.parse(result);
-
-    return parsed.access_token ?? null;
-  } catch (error) {
-    console.error("Failed to fetch access token:", error);
-    return null;
+    const res = await fetch('https://api.getalai.com/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers,
+      body,
+    });
+    const data = await res.json();
+    if (data?.access_token && data?.refresh_token && data?.expires_at) {
+      return {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: data.expires_at,
+      };
+    }
+  } catch (err) {
+    console.error('Failed to get access token via password:', err);
   }
+  return null;
+};
+
+const getAccessTokenFromRefreshToken = async (
+  refreshToken: string
+): Promise<{ access_token: string; refresh_token: string, expires_in: number } | null> => {
+  const headers = new Headers({
+    accept: '*/*',
+    'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
+    apikey: process.env.ALAI_API_KEY!,
+    authorization: `Bearer ${process.env.ALAI_API_KEY!}`,
+    'content-type': 'application/json;charset=UTF-8',
+    origin: 'https://app.getalai.com',
+    priority: 'u=1, i',
+    'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"macOS"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-site',
+    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...',
+    'x-client-info': 'supabase-js-web/2.45.4',
+    'x-supabase-api-version': '2024-01-01',
+  });
+
+  const body = JSON.stringify({ refresh_token: refreshToken });
+
+  try {
+    const res = await fetch('https://api.getalai.com/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers,
+      body,
+    });
+    const data = await res.json();
+    if (data?.access_token && data?.refresh_token) {
+      return {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_in: data.expires_in,
+      };
+    }
+  } catch (err) {
+    console.error('Error refreshing token:', err);
+  }
+  return null;
 };
 
 const createPresentation = async (): Promise<{ id: string, slideId: string } | null> => {

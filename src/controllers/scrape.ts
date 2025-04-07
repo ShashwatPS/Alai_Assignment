@@ -42,10 +42,10 @@ export const crawlWebsite = async (req: Request, res: Response): Promise<any> =>
         return;
       }
 
-      await slidesOutline({
-        websiteContent: scrapeResult.json.websiteContent,
-        company_mission: scrapeResult.json.company_mission
-      });
+      await slidesOutline(
+        scrapeResult.json.websiteContent,
+        scrapeResult.json.company_mission
+      );
 
       res.status(200).json(scrapeResult.json?.websiteContent);
       // console.log(scrapeResult.extract);

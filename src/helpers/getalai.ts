@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import { v4 as uuidv4 } from "uuid";
 import WebSocket from 'ws'; 
 import { getCreatedAt, Instructions } from './constants';
-import { SlidesOutlineProps } from '../interfaces/SlideOutlineProps';
+import { Slide } from '../interfaces/Slide';
 
 dotenv.config();
 
@@ -54,7 +54,7 @@ const getAccessToken = async (): Promise<string | null> => {
   }
 };
 
-const createPresentation = async (): Promise<string | null> => {
+const createPresentation = async (): Promise<{ id: string, slideId: string } | null> => {
   const token = await getAccessToken();
 
   const presentation_id = uuidv4();
@@ -107,21 +107,128 @@ const createPresentation = async (): Promise<string | null> => {
       return null;
     }
 
-    return parsedResult.id;
+    return {id: parsedResult.id, slideId: parsedResult.slides[0].id};
   } catch (error) {
     console.error("Error creating presentation:", error);
     return null;
   }
 };
 
-export const slidesOutline = async ({ websiteContent, company_mission }: SlidesOutlineProps): Promise<any> => {
+// const getCalibrationSampleText = async (presentation_id: string, raw_context: string, token: string): Promise<any> => {
+//   if (!token) {
+//     console.error("Missing access token for calibration sample");
+//     return null;
+//   }
+
+//   const headers = {
+//     "Accept": "application/json, text/plain, */*",
+//     "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+//     "Authorization": `Bearer ${token}`,
+//     "Content-Type": "application/json",
+//     "Origin": "https://app.getalai.com",
+//     "Sec-Fetch-Dest": "empty",
+//     "Sec-Fetch-Mode": "cors",
+//     "Sec-Fetch-Site": "same-site",
+//     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+//     "sec-ch-ua": `"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"`,
+//     "sec-ch-ua-mobile": "?0",
+//     "sec-ch-ua-platform": "\"macOS\"",
+//   };
+
+//   const body = JSON.stringify({
+//     presentation_id,
+//     raw_context,
+//   });
+
+//   try {
+//     const response = await fetch("https://alai-standalone-backend.getalai.com/get-calibration-sample-text", {
+//       method: "POST",
+//       headers,
+//       body,
+//     });
+
+//     if (!response.ok) {
+//       console.error(`Calibration endpoint error: ${response.status} ${response.statusText}`);
+//       return null;
+//     }
+
+//     return await response.json();
+//   } catch (error) {
+//     console.error("Error fetching calibration sample text:", error);
+//     return null;
+//   }
+// };
+
+const createSlides = async (slidesData: Slide[], websiteContent: string, presentation_id: string, token: string, slide_id: string): Promise<any> => {
+  if(!token) {
+    console.error("Missing access token for creating slides");
+    return;
+  }
+
+  // await getCalibrationSampleText(presentation_id, websiteContent, token);
+
+  const ws = new WebSocket('wss://alai-standalone-backend.getalai.com/ws/create-slides-from-outlines', [], {
+    headers: {
+      Origin: 'https://app.getalai.com'
+    }
+  });
+
+  console.log(slidesData);
+  console.log(presentation_id);
+
+  console.log("slide_id",slide_id);
+
+  if (!presentation_id || !token) {
+    console.error("Missing presentation ID or access token");
+    return;
+  }
+
+  const payload = {
+    auth_token: token,
+    presentation_id: presentation_id,
+    presentation_instructions: Instructions,
+    raw_context: websiteContent,
+    slide_id: slide_id,
+    slide_outlines: slidesData,
+    starting_slide_order: 0,
+    update_tone_verbosity_calibration_status: true,
+  };
+
+  if( ws.readyState === WebSocket.OPEN) {
+  ws.send(JSON.stringify(payload));
+  } else {
+    ws.on('open', () => {
+      ws.send(JSON.stringify(payload));
+    });
+  }
+
+  ws.on('message', (data) => {
+    console.log('📩 Message from server:', data.toString());
+  });
+
+  ws.on('error', (err) => {
+    console.error('❌ WebSocket error:', err);
+  });
+
+  ws.on('close', () => {
+    console.log('🔒 WebSocket connection closed');
+  });
+};
+
+export const slidesOutline = async ( websiteContent: string, company_mission: string): Promise<any> => {
   const ws = new WebSocket('wss://alai-standalone-backend.getalai.com/ws/generate-slides-outline', [], {
     headers: {
       Origin: 'https://app.getalai.com'
     }
   });
 
-  const presentation_id = await createPresentation();
+  const presentationData = await createPresentation();
+if (!presentationData) {
+  console.error("Failed to create presentation");
+  return;
+}
+
+const { id: presentation_id, slideId } = presentationData;  
   const token = await getAccessToken();
   const id1 = uuidv4();
   const id2 = uuidv4();
@@ -132,6 +239,8 @@ export const slidesOutline = async ({ websiteContent, company_mission }: SlidesO
     console.error("Missing presentation ID or access token");
     return;
   }
+
+  let slidesData: Slide[] = [];
 
   const payload = {
     auth_token: token,
@@ -169,14 +278,16 @@ export const slidesOutline = async ({ websiteContent, company_mission }: SlidesO
 
   ws.on('message', (data) => {
     console.log('📩 Message from server:', data.toString());
+    slidesData.push(JSON.parse(data.toString()));
   });
 
   ws.on('error', (err) => {
     console.error('❌ WebSocket error:', err);
   });
 
-  ws.on('close', () => {
-    console.log('🔒 WebSocket connection closed');
-  });
+  ws.on('close', async () => {
+  console.log('🔒 WebSocket connection closed');
+  await createSlides(slidesData, websiteContent, presentation_id, token, slideId);
+});
 };
 

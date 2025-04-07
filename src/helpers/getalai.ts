@@ -1,8 +1,8 @@
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 import { v4 as uuidv4 } from "uuid";
-import WebSocket from 'ws'; 
-import { getCreatedAt, Instructions } from './constants';
-import { Slide } from '../interfaces/Slide';
+import WebSocket from "ws";
+import { getCreatedAt, Instructions } from "./constants";
+import { Slide, ScrapedImageGroups, SlideImage } from "../interfaces/Slide";
 
 dotenv.config();
 
@@ -22,7 +22,9 @@ export const getAccessToken = async (): Promise<string | null> => {
   }
 
   if (cachedToken) {
-    const refreshed = await getAccessTokenFromRefreshToken(cachedToken.refresh_token);
+    const refreshed = await getAccessTokenFromRefreshToken(
+      cachedToken.refresh_token
+    );
     if (refreshed) {
       const expiresAt = now + refreshed.expires_in;
       cachedToken = {
@@ -35,7 +37,11 @@ export const getAccessToken = async (): Promise<string | null> => {
   }
 
   const freshToken = await getAccessTokenWithPassword();
-  if (freshToken?.access_token && freshToken?.refresh_token && freshToken?.expires_at) {
+  if (
+    freshToken?.access_token &&
+    freshToken?.refresh_token &&
+    freshToken?.expires_at
+  ) {
     cachedToken = freshToken;
     return cachedToken.access_token;
   }
@@ -49,21 +55,22 @@ const getAccessTokenWithPassword = async (): Promise<{
   expires_at: number;
 } | null> => {
   const headers = new Headers({
-    accept: '*/*',
-    'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
+    accept: "*/*",
+    "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
     apikey: process.env.ALAI_API_KEY!,
-    'content-type': 'application/json;charset=UTF-8',
-    origin: 'https://app.getalai.com',
-    priority: 'u=1, i',
-    'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"macOS"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-site',
-    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...',
-    'x-client-info': 'supabase-js-web/2.45.4',
-    'x-supabase-api-version': '2024-01-01',
+    "content-type": "application/json;charset=UTF-8",
+    origin: "https://app.getalai.com",
+    priority: "u=1, i",
+    "sec-ch-ua":
+      '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...",
+    "x-client-info": "supabase-js-web/2.45.4",
+    "x-supabase-api-version": "2024-01-01",
   });
 
   const body = JSON.stringify({
@@ -73,11 +80,14 @@ const getAccessTokenWithPassword = async (): Promise<{
   });
 
   try {
-    const res = await fetch('https://api.getalai.com/auth/v1/token?grant_type=password', {
-      method: 'POST',
-      headers,
-      body,
-    });
+    const res = await fetch(
+      "https://api.getalai.com/auth/v1/token?grant_type=password",
+      {
+        method: "POST",
+        headers,
+        body,
+      }
+    );
     const data = await res.json();
     if (data?.access_token && data?.refresh_token && data?.expires_at) {
       return {
@@ -87,41 +97,49 @@ const getAccessTokenWithPassword = async (): Promise<{
       };
     }
   } catch (err) {
-    console.error('Failed to get access token via password:', err);
+    console.error("Failed to get access token via password:", err);
   }
   return null;
 };
 
 const getAccessTokenFromRefreshToken = async (
   refreshToken: string
-): Promise<{ access_token: string; refresh_token: string, expires_in: number } | null> => {
+): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+} | null> => {
   const headers = new Headers({
-    accept: '*/*',
-    'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
+    accept: "*/*",
+    "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
     apikey: process.env.ALAI_API_KEY!,
     authorization: `Bearer ${process.env.ALAI_API_KEY!}`,
-    'content-type': 'application/json;charset=UTF-8',
-    origin: 'https://app.getalai.com',
-    priority: 'u=1, i',
-    'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"macOS"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-site',
-    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...',
-    'x-client-info': 'supabase-js-web/2.45.4',
-    'x-supabase-api-version': '2024-01-01',
+    "content-type": "application/json;charset=UTF-8",
+    origin: "https://app.getalai.com",
+    priority: "u=1, i",
+    "sec-ch-ua":
+      '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...",
+    "x-client-info": "supabase-js-web/2.45.4",
+    "x-supabase-api-version": "2024-01-01",
   });
 
   const body = JSON.stringify({ refresh_token: refreshToken });
 
   try {
-    const res = await fetch('https://api.getalai.com/auth/v1/token?grant_type=refresh_token', {
-      method: 'POST',
-      headers,
-      body,
-    });
+    const res = await fetch(
+      "https://api.getalai.com/auth/v1/token?grant_type=refresh_token",
+      {
+        method: "POST",
+        headers,
+        body,
+      }
+    );
     const data = await res.json();
     if (data?.access_token && data?.refresh_token) {
       return {
@@ -131,12 +149,15 @@ const getAccessTokenFromRefreshToken = async (
       };
     }
   } catch (err) {
-    console.error('Error refreshing token:', err);
+    console.error("Error refreshing token:", err);
   }
   return null;
 };
 
-const createPresentation = async (): Promise<{ id: string, slideId: string } | null> => {
+const createPresentation = async (): Promise<{
+  id: string;
+  slideId: string;
+} | null> => {
   const token = await getAccessToken();
 
   const presentation_id = uuidv4();
@@ -147,15 +168,16 @@ const createPresentation = async (): Promise<{ id: string, slideId: string } | n
   }
 
   const headers = new Headers({
-    "Accept": "*/*",
+    Accept: "*/*",
     "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
-    "Authorization": `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    "Origin": "https://app.getalai.com",
+    Origin: "https://app.getalai.com",
     "User-Agent": "Mozilla/5.0",
-    "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
+    "sec-ch-ua":
+      '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
     "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"macOS\""
+    "sec-ch-ua-platform": '"macOS"',
   });
 
   const body = JSON.stringify({
@@ -163,21 +185,26 @@ const createPresentation = async (): Promise<{ id: string, slideId: string } | n
     presentation_title: "Untitled Presentation",
     create_first_slide: true,
     theme_id: "a6bff6e5-3afc-4336-830b-fbc710081012",
-    default_color_set_id: 0
+    default_color_set_id: 0,
   });
 
   const requestOptions = {
     method: "POST",
     headers,
     body,
-    redirect: "follow" as RequestRedirect
+    redirect: "follow" as RequestRedirect,
   };
 
   try {
-    const response = await fetch("https://alai-standalone-backend.getalai.com/create-new-presentation", requestOptions);
+    const response = await fetch(
+      "https://alai-standalone-backend.getalai.com/create-new-presentation",
+      requestOptions
+    );
 
     if (!response.ok) {
-      console.error(`Failed to create presentation: ${response.status} ${response.statusText}`);
+      console.error(
+        `Failed to create presentation: ${response.status} ${response.statusText}`
+      );
       return null;
     }
 
@@ -189,26 +216,36 @@ const createPresentation = async (): Promise<{ id: string, slideId: string } | n
       return null;
     }
 
-    return {id: parsedResult.id, slideId: parsedResult.slides[0].id};
+    return { id: parsedResult.id, slideId: parsedResult.slides[0].id };
   } catch (error) {
     console.error("Error creating presentation:", error);
     return null;
   }
 };
 
-const createSlides = async (slidesData: Slide[], websiteContent: string, presentation_id: string, token: string, slide_id: string): Promise<any> => {
-  if(!token) {
+const createSlides = async (
+  slidesData: Slide[],
+  websiteContent: string,
+  presentation_id: string,
+  token: string,
+  slide_id: string
+): Promise<any> => {
+  if (!token) {
     console.error("Missing access token for creating slides");
     return;
   }
 
   let variantPick = true;
 
-  const ws = new WebSocket('wss://alai-standalone-backend.getalai.com/ws/create-slides-from-outlines', [], {
-    headers: {
-      Origin: 'https://app.getalai.com'
+  const ws = new WebSocket(
+    "wss://alai-standalone-backend.getalai.com/ws/create-slides-from-outlines",
+    [],
+    {
+      headers: {
+        Origin: "https://app.getalai.com",
+      },
     }
-  });
+  );
 
   if (!presentation_id || !token) {
     console.error("Missing presentation ID or access token");
@@ -226,58 +263,54 @@ const createSlides = async (slidesData: Slide[], websiteContent: string, present
     update_tone_verbosity_calibration_status: true,
   };
 
-  if( ws.readyState === WebSocket.OPEN) {
-  ws.send(JSON.stringify(payload));
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
   } else {
-    ws.on('open', () => {
+    ws.on("open", () => {
       ws.send(JSON.stringify(payload));
     });
   }
 
-  ws.on('message',async (data) => {
-    console.log('📩 Message from server:', data.toString());
+  ws.on("message", async (data) => {
     const parsedData = JSON.parse(data.toString());
-
-    console.log("Parsed Data:", parsedData);
 
     if (parsedData.slides && Array.isArray(parsedData.slides)) {
       parsedData.slides.forEach(async (slide: any) => {
-          console.log("Processing slide:", slide);
-          if(slide_id != slide.id) {
+        if (slide_id != slide.id) {
+          console.log("Slide images", slide.slide_outline?.images_on_slide);
           await getVariants(
-              token, 
-              presentation_id,
-              slide.id,
-              slide.slide_outline?.slide_instructions ?? "",
-              slide.slide_outline?.slide_context ?? "",
-              slide.slide_outline?.slide_title ?? ""
+            token,
+            presentation_id,
+            slide.id,
+            slide.slide_outline?.slide_instructions ?? "",
+            slide.slide_outline?.slide_context ?? "",
+            slide.slide_outline?.slide_title ?? "",
+            slide.slide_outline?.images_on_slide ?? null
           );
         }
       });
-  }
+    }
 
-
-  if(parsedData.is_discarded === false && variantPick === true) {
-    variantPick = false;
-    await setSlideStatus(parsedData.slide_id, token);
-    await pickSlideVariant(parsedData.slide_id, parsedData.id, token);
-  }
-
+    if (parsedData.is_discarded === false && variantPick === true) {
+      variantPick = false;
+      await setSlideStatus(parsedData.slide_id, token);
+      await pickSlideVariant(parsedData.slide_id, parsedData.id, token);
+    }
   });
 
-  ws.on('error', (err) => {
-    console.error('❌ WebSocket error:', err);
+  ws.on("error", (err) => {
+    console.error("❌ WebSocket error:", err);
   });
 
-  ws.on('close', () => {
-    console.log('🔒 WebSocket connection closed');
+  ws.on("close", () => {
+    console.log("🔒 WebSocket connection closed");
   });
 };
 
-
 export const slidesOutline = async (
   websiteContent: string,
-  company_mission: string
+  company_mission: string,
+  scrapedImageUrls: ScrapedImageGroups | null
 ): Promise<string | null> => {
   const token = await getAccessToken();
   const presentationData = await createPresentation();
@@ -330,32 +363,58 @@ export const slidesOutline = async (
 
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(
-      'wss://alai-standalone-backend.getalai.com/ws/generate-slides-outline',
+      "wss://alai-standalone-backend.getalai.com/ws/generate-slides-outline",
       [],
       {
         headers: {
-          Origin: 'https://app.getalai.com',
+          Origin: "https://app.getalai.com",
         },
       }
     );
 
-    ws.on('open', () => {
+    ws.on("open", () => {
       ws.send(JSON.stringify(payload));
     });
 
-    ws.on('message', (data) => {
-      console.log('📩 Message from server:', data.toString());
+    ws.on("message", (data) => {
       slidesData.push(JSON.parse(data.toString()));
     });
 
-    ws.on('error', (err) => {
-      console.error('❌ WebSocket error:', err);
+    ws.on("error", (err) => {
+      console.error("❌ WebSocket error:", err);
       reject(err);
     });
 
-    ws.on('close', async () => {
-      console.log('🔒 WebSocket connection closed');
-      await createSlides(slidesData, websiteContent, presentation_id, token, slideId);
+    ws.on("close", async () => {
+      console.log("🔒 WebSocket connection closed");
+      const imageSections = [
+        "introduction",
+        "features",
+        "how_it_works",
+        "target_audience",
+        "vision",
+      ] as const;
+
+      slidesData.forEach((slide, index) => {
+        const section = imageSections[index];
+        const urls = scrapedImageUrls?.[section];
+
+        if (Array.isArray(urls) && urls.length > 0) {
+          slide.images_on_slide = urls.map((url) => ({
+            file_path: "",
+            url,
+          }));
+        }
+        console.log("Slide data:", slide.images_on_slide);
+      });
+
+      await createSlides(
+        slidesData,
+        websiteContent,
+        presentation_id,
+        token,
+        slideId
+      );
       resolve(presentation_id);
     });
   });
@@ -367,37 +426,46 @@ const setSlideStatus = async (
   status: string = "DEFAULT"
 ): Promise<void> => {
   const headers = new Headers({
-    "Accept": "*/*",
+    Accept: "*/*",
     "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
-    "Authorization": `Bearer ${token}`,
-    "Connection": "keep-alive",
+    Authorization: `Bearer ${token}`,
+    Connection: "keep-alive",
     "Content-Type": "application/json",
-    "Origin": "https://app.getalai.com",
+    Origin: "https://app.getalai.com",
     "Sec-Fetch-Dest": "empty",
     "Sec-Fetch-Mode": "cors",
     "Sec-Fetch-Site": "same-site",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-    "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+    "sec-ch-ua":
+      '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
     "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"macOS\""
+    "sec-ch-ua-platform": '"macOS"',
   });
 
   const body = JSON.stringify({
     slide_id: slideId,
-    slide_status: status
+    slide_status: status,
   });
 
   try {
-    const response = await fetch("https://alai-standalone-backend.getalai.com/set-slide-status", {
-      method: "POST",
-      headers,
-      body,
-      redirect: "follow" as RequestRedirect
-    });
+    const response = await fetch(
+      "https://alai-standalone-backend.getalai.com/set-slide-status",
+      {
+        method: "POST",
+        headers,
+        body,
+        redirect: "follow" as RequestRedirect,
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("❌ Failed to set slide status:", response.status, errorText);
+      console.error(
+        "❌ Failed to set slide status:",
+        response.status,
+        errorText
+      );
     } else {
       console.log("✅ Slide status set successfully");
     }
@@ -406,14 +474,26 @@ const setSlideStatus = async (
   }
 };
 
-const getVariants = async ( auth_token: string, presentation_id: string,slide_id: string, additional_instructions: string, slide_specific_context: string,slide_title: string ): Promise<any> => {
-  const ws = new WebSocket('wss://alai-standalone-backend.getalai.com/ws/create-and-stream-slide-variants', [], {
-    headers: {
-      Origin: 'https://app.getalai.com'
-    }
-  });
+const getVariants = async (
+  auth_token: string,
+  presentation_id: string,
+  slide_id: string,
+  additional_instructions: string,
+  slide_specific_context: string,
+  slide_title: string,
+  images_on_slide: SlideImage[] | null,
+): Promise<any> => {
+  console.log("Images on Slide : ", images_on_slide);
 
-  console.log("Getting variants");
+  const ws = new WebSocket(
+    "wss://alai-standalone-backend.getalai.com/ws/create-and-stream-slide-variants",
+    [],
+    {
+      headers: {
+        Origin: "https://app.getalai.com",
+      },
+    }
+  );
 
   if (!presentation_id || !auth_token) {
     console.error("Missing presentation ID or access token");
@@ -425,41 +505,39 @@ const getVariants = async ( auth_token: string, presentation_id: string,slide_id
   const payload = {
     additional_instructions,
     auth_token,
-    images_on_slide: [],
+    images_on_slide,
     layout_type: "AI_GENERATED_LAYOUT",
     presentation_id,
     slide_id,
     slide_specific_context,
     slide_title,
-    update_tone_verbosity_calibration_status: false
+    update_tone_verbosity_calibration_status: false,
   };
 
   if (ws.readyState === WebSocket.OPEN) {
-  ws.send(JSON.stringify(payload));
+    ws.send(JSON.stringify(payload));
   } else {
-    ws.on('open', () => {
+    ws.on("open", () => {
       ws.send(JSON.stringify(payload));
     });
   }
-  console.log("Payload sent:", payload);
 
-  ws.on('message', async (data) => {
-    console.log('📩 Message from server:', data.toString());
+  ws.on("message", async (data) => {
     const parsedData = JSON.parse(data.toString());
-    if(parsedData.is_discarded === false && variantPick === true) {
+    if (parsedData.is_discarded === false && variantPick === true) {
       variantPick = false;
       await pickSlideVariant(parsedData.slide_id, parsedData.id, auth_token);
       await setSlideStatus(parsedData.slide_id, auth_token);
     }
   });
 
-  ws.on('error', (err) => {
-    console.error('❌ WebSocket error:', err);
+  ws.on("error", (err) => {
+    console.error("❌ WebSocket error:", err);
   });
 
-  ws.on('close', async () => {
-  console.log('🔒 WebSocket connection closed');
-});
+  ws.on("close", async () => {
+    console.log("🔒 WebSocket connection closed");
+  });
 };
 
 const pickSlideVariant = async (
@@ -477,27 +555,35 @@ const pickSlideVariant = async (
   myHeaders.append("Sec-Fetch-Dest", "empty");
   myHeaders.append("Sec-Fetch-Mode", "cors");
   myHeaders.append("Sec-Fetch-Site", "same-site");
-  myHeaders.append("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36");
-  myHeaders.append("sec-ch-ua", "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"");
+  myHeaders.append(
+    "User-Agent",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+  );
+  myHeaders.append(
+    "sec-ch-ua",
+    '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"'
+  );
   myHeaders.append("sec-ch-ua-mobile", "?0");
-  myHeaders.append("sec-ch-ua-platform", "\"macOS\"");
+  myHeaders.append("sec-ch-ua-platform", '"macOS"');
 
   const raw = JSON.stringify({
     slide_id: slideId,
-    variant_id: variantId
+    variant_id: variantId,
   });
 
   const requestOptions = {
     method: "POST",
     headers: myHeaders,
     body: raw,
-    redirect: "follow" as RequestRedirect
+    redirect: "follow" as RequestRedirect,
   };
 
   try {
-    const response = await fetch("https://alai-standalone-backend.getalai.com/pick-slide-variant", requestOptions);
+    const response = await fetch(
+      "https://alai-standalone-backend.getalai.com/pick-slide-variant",
+      requestOptions
+    );
     const result = await response.text();
-    console.log("✅ Picked variant result:", result);
   } catch (error) {
     console.error("❌ Error picking slide variant:", error);
   }

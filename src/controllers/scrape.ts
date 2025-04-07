@@ -42,11 +42,17 @@ export const crawlWebsite = async (req: Request, res: Response): Promise<any> =>
         return;
       }
 
-      await slidesOutline(
+      const presentation = await slidesOutline(
         scrapeResult.json.websiteContent,
         scrapeResult.json.company_mission
       );
 
-      res.status(200).json(scrapeResult.json?.websiteContent);
-      // console.log(scrapeResult.extract);
+      if(!presentation) {
+        res.status(500).json({ error: "Failed to create presentation" });
+        return;
+      }
+
+      const presentationURL = "https://app.getalai.com/presentation/"+ presentation;
+
+      res.status(200).json(presentationURL);
 };

@@ -73,5 +73,5 @@ export const crawlWebsite = async (req: Request, res: Response): Promise<any> =>
 
       const presentationURL = "https://app.getalai.com/presentation/"+ presentation;
 
-      res.status(200).json(scrapeResult);
+      res.status(200).json(presentationURL);
 };

@@ -114,51 +114,6 @@ const createPresentation = async (): Promise<{ id: string, slideId: string } | n
   }
 };
 
-// const getCalibrationSampleText = async (presentation_id: string, raw_context: string, token: string): Promise<any> => {
-//   if (!token) {
-//     console.error("Missing access token for calibration sample");
-//     return null;
-//   }
-
-//   const headers = {
-//     "Accept": "application/json, text/plain, */*",
-//     "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
-//     "Authorization": `Bearer ${token}`,
-//     "Content-Type": "application/json",
-//     "Origin": "https://app.getalai.com",
-//     "Sec-Fetch-Dest": "empty",
-//     "Sec-Fetch-Mode": "cors",
-//     "Sec-Fetch-Site": "same-site",
-//     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-//     "sec-ch-ua": `"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"`,
-//     "sec-ch-ua-mobile": "?0",
-//     "sec-ch-ua-platform": "\"macOS\"",
-//   };
-
-//   const body = JSON.stringify({
-//     presentation_id,
-//     raw_context,
-//   });
-
-//   try {
-//     const response = await fetch("https://alai-standalone-backend.getalai.com/get-calibration-sample-text", {
-//       method: "POST",
-//       headers,
-//       body,
-//     });
-
-//     if (!response.ok) {
-//       console.error(`Calibration endpoint error: ${response.status} ${response.statusText}`);
-//       return null;
-//     }
-
-//     return await response.json();
-//   } catch (error) {
-//     console.error("Error fetching calibration sample text:", error);
-//     return null;
-//   }
-// };
-
 const createSlides = async (slidesData: Slide[], websiteContent: string, presentation_id: string, token: string, slide_id: string): Promise<any> => {
   if(!token) {
     console.error("Missing access token for creating slides");
@@ -172,11 +127,6 @@ const createSlides = async (slidesData: Slide[], websiteContent: string, present
       Origin: 'https://app.getalai.com'
     }
   });
-
-  console.log(slidesData);
-  console.log(presentation_id);
-
-  console.log("slide_id",slide_id);
 
   if (!presentation_id || !token) {
     console.error("Missing presentation ID or access token");
@@ -204,6 +154,25 @@ const createSlides = async (slidesData: Slide[], websiteContent: string, present
 
   ws.on('message', (data) => {
     console.log('📩 Message from server:', data.toString());
+    const parsedData = JSON.parse(data.toString());
+
+    console.log("Parsed Data:", parsedData);
+
+    if (parsedData.slides && Array.isArray(parsedData.slides)) {
+      parsedData.slides.forEach(async (slide: any) => {
+          console.log("Processing slide:", slide);
+          if(slide_id != slide.id) {
+          getVariants(
+              token, 
+              presentation_id,
+              slide.id,
+              slide.slide_outline?.slide_instructions ?? "",
+              slide.slide_outline?.slide_context ?? "",
+              slide.slide_outline?.slide_title ?? ""
+          );
+        }
+      });
+  }
   });
 
   ws.on('error', (err) => {
@@ -214,6 +183,7 @@ const createSlides = async (slidesData: Slide[], websiteContent: string, present
     console.log('🔒 WebSocket connection closed');
   });
 };
+
 
 export const slidesOutline = async ( websiteContent: string, company_mission: string): Promise<any> => {
   const ws = new WebSocket('wss://alai-standalone-backend.getalai.com/ws/generate-slides-outline', [], {
@@ -291,3 +261,54 @@ const { id: presentation_id, slideId } = presentationData;
 });
 };
 
+export const getVariants = async ( auth_token: string, presentation_id: string,slide_id: string, additional_instructions: string, slide_specific_context: string,slide_title: string ): Promise<any> => {
+  const ws = new WebSocket('wss://alai-standalone-backend.getalai.com/ws/create-and-stream-slide-variants', [], {
+    headers: {
+      Origin: 'https://app.getalai.com'
+    }
+  });
+
+  console.log("Getting variants");
+
+  if (!presentation_id || !auth_token) {
+    console.error("Missing presentation ID or access token");
+    return;
+  }
+
+  let slidesData: Slide[] = [];
+
+  const payload = {
+    additional_instructions,
+    auth_token,
+    images_on_slide: [],
+    layout_type: "AI_GENERATED_LAYOUT",
+    presentation_id,
+    slide_id,
+    slide_specific_context,
+    slide_title,
+    update_tone_verbosity_calibration_status: false
+  };
+
+  if (ws.readyState === WebSocket.OPEN) {
+  ws.send(JSON.stringify(payload));
+  } else {
+    ws.on('open', () => {
+      ws.send(JSON.stringify(payload));
+    });
+  }
+  console.log("Payload sent:", payload);
+
+  ws.on('message', (data) => {
+    console.log('📩 Message from server:', data.toString());
+    slidesData.push(JSON.parse(data.toString()));
+  });
+
+  ws.on('error', (err) => {
+    console.error('❌ WebSocket error:', err);
+  });
+
+  ws.on('close', async () => {
+  console.log('🔒 WebSocket connection closed');
+  // await createSlides(slidesData, websiteContent, presentation_id, token, slideId);
+});
+};

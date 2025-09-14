@@ -1,5 +1,3 @@
-# YC Application
-
 This project is an Express-based application that integrates with Firecrawl and GetAlai to scrape website data and create AI-generated presentations. It leverages WebSockets to create slides and variants based on key website content.
 
 ## Setup
